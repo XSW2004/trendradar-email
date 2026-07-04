@@ -1,0 +1,52 @@
+name: Get Hot News
+
+on:
+  schedule:
+    # GitHub Actions cron uses UTC. 12:00 UTC = 20:00 Beijing time.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: crawler-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          clean: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Verify required files
+        run: |
+          if [ ! -f config/config.yaml ]; then
+            echo "Error: config/config.yaml missing"
+            exit 1
+          fi
+
+      - name: Run TrendRadar and send QQ email
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          GITHUB_ACTIONS: true
+        run: uv run python -m trendradar
